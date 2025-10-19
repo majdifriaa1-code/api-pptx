@@ -1,76 +1,105 @@
 const express = require('express');
-const officegen = require('officegen');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middleware pour lire le corps des requêtes JSON
 app.use(express.json());
 
-// Définir la route '/api/generate'
+// La fonction qui génère le HTML
+function generateHtmlPresentation(reportText) {
+    const sections = reportText.split('\n\n');
+    let slidesHtml = '';
+
+    sections.forEach(section => {
+        const lines = section.split('\n');
+        const title = lines.shift() || '';
+        const content = lines.map(p => `<p>${p}</p>`).join('');
+
+        slidesHtml += `
+            <div class="slide">
+                <h1>${title}</h1>
+                <div class="content">
+                    ${content}
+                </div>
+            </div>
+        `;
+    });
+
+    // Le modèle HTML complet avec le style CSS intégré
+    return `
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Présentation</title>
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+                
+                body {
+                    margin: 0;
+                    font-family: 'Poppins', sans-serif;
+                    background-color: #f0f2f5;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    padding: 2rem;
+                }
+                .slide {
+                    background-color: white;
+                    width: 1600px;
+                    height: 900px;
+                    margin-bottom: 2rem;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                    padding: 60px 80px;
+                    box-sizing: border-box;
+                    display: flex;
+                    flex-direction: column;
+                    transform-origin: top center;
+                }
+                h1 {
+                    font-size: 60px;
+                    color: #123456; /* Bleu nuit */
+                    font-weight: 600;
+                    margin: 0 0 40px 0;
+                    padding-bottom: 20px;
+                    border-bottom: 4px solid #009FB8; /* Turquoise */
+                }
+                .content p {
+                    font-size: 28px;
+                    color: #333;
+                    line-height: 1.6;
+                    margin: 0 0 20px 0;
+                }
+            </style>
+        </head>
+        <body>
+            ${slidesHtml}
+        </body>
+        </html>
+    `;
+}
+
+// La route de notre API
 app.post('/api/generate', (req, res) => {
     try {
         const reportText = req.body.text;
         if (!reportText) {
-            return res.status(400).json({ message: "La clé 'text' est manquante dans le corps de la requête." });
+            return res.status(400).json({ message: "La clé 'text' est manquante." });
         }
 
-        // --- Début de la logique Officegen ---
+        const html = generateHtmlPresentation(reportText);
 
-        // Créer un objet de présentation PowerPoint
-        const pptx = officegen('pptx');
-
-        // Gérer les erreurs de la bibliothèque officegen
-        pptx.on('error', (err) => {
-            console.error("Erreur Officegen:", err);
-            if (!res.headersSent) {
-                res.status(500).json({ message: 'Erreur lors de la génération du fichier.' });
-            }
-        });
-
-        // Découper le rapport en sections (paragraphes)
-        const sections = reportText.split('\n\n');
-
-        // Créer une diapositive pour chaque section
-        for (const section of sections) {
-            // Créer une nouvelle diapositive
-            const slide = pptx.newSlide();
-
-            const lines = section.split('\n');
-            const title = lines.shift() || ' '; // Le titre ne peut pas être vide
-            const content = lines.join('\n');
-
-            // Ajouter le titre à la diapositive
-            slide.addText(title, { 
-                x: '5%', y: '5%', 
-                w: '90%', h: '10%', 
-                font_size: 32, font_face: 'Arial', bold: true
-            });
-
-            // Ajouter le contenu à la diapositive
-            slide.addText(content, { 
-                x: '5%', y: '20%', 
-                w: '90%', h: '75%', 
-                font_size: 16, font_face: 'Arial'
-            });
-        }
-
-        // Définir les en-têtes pour le téléchargement du fichier
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
-        res.setHeader('Content-Disposition', 'attachment; filename=presentation.pptx');
-
-        // Générer le fichier et l'envoyer directement au client
-        pptx.generate(res);
+        res.setHeader('Content-Type', 'text/html');
+        res.send(html);
 
     } catch (error) {
-        console.error("Erreur inattendue dans le serveur:", error);
-        if (!res.headersSent) {
-            res.status(500).json({ message: "Une erreur interne inattendue est survenue.", details: error.message });
-        }
+        console.error("Erreur serveur:", error);
+        res.status(500).json({ message: "Une erreur interne est survenue." });
     }
 });
 
-// Démarrer le serveur
 app.listen(port, () => {
     console.log(`Serveur démarré sur le port ${port}`);
 });
