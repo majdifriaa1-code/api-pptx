@@ -1,35 +1,51 @@
-const PptxGenJS = require("pptxgenjs");
+const officegen = require('officegen');
+const fs = require('fs');
 
-async function generatePptx(reportText) {
-    let pres = new PptxGenJS();
-    pres.layout = "LAYOUT_16x9";
-    const COLOR_PRIMARY = '123456';
-    const FONT_HEADLINE = "Helvetica Neue";
-    
-    pres.defineSlideMaster({
-        title: "MASTER_SLIDE",
-        background: { color: "FFFFFF" },
-        objects: [
-            { placeholder: { options: { name: "title", type: "title", x: 1, y: 0.5, w: '85%', h: 1, fontFace: FONT_HEADLINE, fontSize: 36, color: COLOR_PRIMARY, bold: true } } },
-            { placeholder: { options: { name: "body", type: "body", x: 1, y: 2.2, w: '85%', h: 5.5, fontFace: FONT_HEADLINE, fontSize: 18 } } },
-        ],
+function generatePptx(reportText, res) {
+    // Créer une nouvelle présentation avec officegen
+    const pptx = officegen('pptx');
+
+    // Gérer les erreurs de la bibliothèque
+    pptx.on('error', function(err) {
+        console.error("Erreur Officegen:", err);
+        if (!res.headersSent) {
+            res.status(500).json({ message: 'Erreur lors de la génération du fichier PPTX.' });
+        }
     });
 
+    // Découper le rapport en sections
     const sections = reportText.split('\n\n');
-    slidesData = sections.map(section => {
+
+    // Créer une diapositive pour chaque section
+    sections.forEach(section => {
+        const slide = pptx.newSlide();
+        
         const lines = section.split('\n');
         const title = lines.shift() || '';
         const content = lines.join('\n');
-        return { title, content };
+
+        // Ajouter le titre
+        slide.addText(title, { 
+            x: '5%', y: '5%', 
+            w: '90%', h: '10%', 
+            font_size: 36, font_face: 'Helvetica Neue', bold: true, color: '363636' 
+        });
+
+        // Ajouter le contenu
+        slide.addText(content, { 
+            x: '5%', y: '20%', 
+            w: '90%', h: '75%', 
+            font_size: 18, font_face: 'Helvetica Neue', color: '4f4f4f'
+        });
     });
 
-    for (const slideData of slidesData) {
-        const slide = pres.addSlide({ masterName: "MASTER_SLIDE" });
-        slide.addText(slideData.title, { placeholder: "title" });
-        slide.addText(slideData.content, { placeholder: "body" });
-    }
+    // Définir les en-têtes de la réponse pour le téléchargement
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
+    res.setHeader('Content-Disposition', 'attachment; filename=presentation.pptx');
 
-    return await pres.write({ outputType: "buffer" });
+    // Générer le fichier et l'envoyer directement dans la réponse
+    // C'est une méthode de streaming, très efficace
+    pptx.generate(res);
 }
 
 module.exports = { generatePptx };
