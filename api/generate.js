@@ -1,5 +1,4 @@
-// Importer la bibliothèque
-const PptxGenJS = require("pptxgenjs");
+import PptxGenJS from "pptxgenjs";
 
 // Ceci est la fonction "Serverless" que Vercel va exécuter
 export default async function handler(req, res) {
@@ -9,8 +8,29 @@ export default async function handler(req, res) {
       return res.status(405).json({ message: 'Seules les requêtes POST sont autorisées' });
     }
 
-    // Récupérer le texte depuis le corps de la requête envoyée par n8n
-    const reportText = req.body.text || "Aucun texte fourni.";
+    // --- DÉBUT DE LA CORRECTION ---
+    // Vercel ne "parse" pas le body JSON automatiquement.
+    // Nous devons lire le flux de données entrant et le transformer en objet JSON.
+    const body = await new Promise((resolve, reject) => {
+        let data = '';
+        req.on('data', chunk => {
+            data += chunk;
+        });
+        req.on('end', () => {
+            try {
+                resolve(JSON.parse(data));
+            } catch (e) {
+                reject(e);
+            }
+        });
+        req.on('error', err => {
+            reject(err);
+        });
+    });
+    // --- FIN DE LA CORRECTION ---
+
+    // On utilise maintenant `body.text` au lieu de `req.body.text`
+    const reportText = body.text || "Aucun texte fourni.";
 
     // Créer une nouvelle présentation
     let pres = new PptxGenJS();
