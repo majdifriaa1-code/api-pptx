@@ -1,0 +1,5 @@
+# Ignorer le dossier des dépendances
+node_modules
+
+# Fichiers de logs
+npm-debug.log
