@@ -1,7 +1,12 @@
 {
-  "name": "api-pptx-generator",
+  "name": "api-pptx-server",
   "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
+    "express": "^4.19.2",
     "pptxgenjs": "^3.12.0"
   }
 }
