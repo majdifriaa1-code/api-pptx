@@ -1,40 +1,26 @@
-// On utilise la syntaxe "require" pour être le plus compatible possible.
 const PptxGenJS = require("pptxgenjs");
 
-// On exporte la fonction avec la syntaxe "module.exports".
 module.exports = async (req, res) => {
     try {
-        // 1. Vérifier que la méthode est bien POST
         if (req.method !== 'POST') {
             return res.status(405).json({ message: 'Méthode non autorisée.' });
         }
 
-        // 2. Lire le corps de la requête manuellement (méthode la plus fiable)
         const body = await new Promise((resolve, reject) => {
             let data = '';
             req.on('data', chunk => { data += chunk; });
             req.on('end', () => {
-                // Si le corps est vide, on résout avec un objet vide
-                // pour éviter l'erreur 'Unexpected end of JSON input'.
-                if (!data) {
-                    return resolve({});
-                }
-                try {
-                    resolve(JSON.parse(data));
-                } catch (error) {
-                    reject(new Error('JSON mal formaté'));
-                }
+                if (!data) return resolve({});
+                try { resolve(JSON.parse(data)); } catch (e) { reject(new Error('JSON mal formaté')); }
             });
             req.on('error', err => reject(err));
         });
 
-        // 3. Récupérer le texte (gère le cas où `body` est vide ou sans la clé `text`)
         const reportText = body.text;
         if (!reportText) {
             return res.status(400).json({ message: "La clé 'text' est manquante dans le corps de la requête JSON." });
         }
         
-        // 4. Logique de génération du PowerPoint (inchangée)
         let pres = new PptxGenJS();
         pres.layout = "LAYOUT_16x9";
         const COLOR_PRIMARY = '123456';
@@ -67,10 +53,12 @@ module.exports = async (req, res) => {
         
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
         res.setHeader('Content-Disposition', 'attachment; filename=presentation.pptx');
-        res.send(pptxBuffer);
+        
+        // --- LA CORRECTION EST ICI ---
+        // On utilise res.end() au lieu de res.send() pour envoyer le buffer.
+        res.end(pptxBuffer);
 
     } catch (error) {
-        // 5. Gestion des erreurs améliorée
         console.error("Erreur serveur:", error);
         res.status(500).json({ message: "Une erreur interne est survenue.", details: error.message });
     }
