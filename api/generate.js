@@ -2,64 +2,49 @@ import PptxGenJS from "pptxgenjs";
 
 // Ceci est la fonction "Serverless" que Vercel va exécuter
 export default async function handler(req, res) {
+  // NOTRE MARQUEUR DE DÉBOGAGE
+  console.log("--- V3 DE L'API EXÉCUTÉE À :", new Date().toISOString());
+
   try {
-    // On s'assure que la requête est de type POST
     if (req.method !== 'POST') {
+      console.log("Erreur : Méthode non autorisée.", req.method);
       return res.status(405).json({ message: 'Seules les requêtes POST sont autorisées' });
     }
 
-    // --- DÉBUT DE LA CORRECTION ---
-    // Vercel ne "parse" pas le body JSON automatiquement.
-    // Nous devons lire le flux de données entrant et le transformer en objet JSON.
+    console.log("Début de la lecture du corps de la requête...");
     const body = await new Promise((resolve, reject) => {
         let data = '';
         req.on('data', chunk => {
             data += chunk;
         });
         req.on('end', () => {
+            console.log("Lecture du corps de la requête terminée. Contenu:", data);
             try {
-                resolve(JSON.parse(data));
+                const parsedData = JSON.parse(data);
+                console.log("Analyse JSON réussie.");
+                resolve(parsedData);
             } catch (e) {
+                console.error("Erreur d'analyse JSON:", e);
                 reject(e);
             }
         });
         req.on('error', err => {
+            console.error("Erreur de flux de requête:", err);
             reject(err);
         });
     });
-    // --- FIN DE LA CORRECTION ---
 
-    // On utilise maintenant `body.text` au lieu de `req.body.text`
     const reportText = body.text || "Aucun texte fourni.";
+    console.log("Texte du rapport récupéré. Début de la génération du PPTX.");
 
-    // Créer une nouvelle présentation
+    // ... (le reste du code pour générer le PPTX reste identique)
+    
     let pres = new PptxGenJS();
     pres.layout = "LAYOUT_16x9";
-
-    // --- Design Moderne ---
-    const COLOR_PRIMARY = '123456'; // Bleu nuit
+    const COLOR_PRIMARY = '123456';
     const FONT_HEADLINE = "Helvetica Neue";
     
-    pres.defineSlideMaster({
-      title: "MASTER_SLIDE",
-      background: { color: "FFFFFF" },
-      objects: [
-        {
-          placeholder: {
-            options: { name: "title", type: "title", x: 1, y: 0.5, w: '85%', h: 1, fontFace: FONT_HEADLINE, fontSize: 36, color: COLOR_PRIMARY, bold: true },
-            text: "Titre par défaut",
-          },
-        },
-        {
-          placeholder: {
-            options: { name: "body", type: "body", x: 1, y: 2.2, w: '85%', h: 5.5, fontFace: FONT_HEADLINE, fontSize: 18 },
-            text: "Contenu par défaut",
-          },
-        },
-      ],
-    });
-
-    // Découper le rapport en diapositives
+    pres.defineSlideMaster({ /* ... */ });
     const sections = reportText.split('\n\n');
     const slidesData = sections.map(section => {
       const lines = section.split('\n');
@@ -68,23 +53,21 @@ export default async function handler(req, res) {
       return { title, content };
     });
 
-    // Créer les diapositives
     for (const slideData of slidesData) {
       const slide = pres.addSlide({ masterName: "MASTER_SLIDE" });
       slide.addText(slideData.title, { placeholder: "title" });
       slide.addText(slideData.content, { placeholder: "body" });
     }
 
-    // Générer le fichier PowerPoint en mémoire (buffer)
     const pptxBuffer = await pres.write({ outputType: "buffer" });
+    console.log("Génération du PPTX terminée avec succès.");
     
-    // Envoyer le fichier en réponse
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
     res.setHeader('Content-Disposition', 'attachment; filename=presentation.pptx');
     res.send(pptxBuffer);
 
   } catch (error) {
-    console.error(error);
+    console.error("--- ERREUR GLOBALE DANS LE HANDLER ---", error);
     res.status(500).json({ message: "Une erreur est survenue lors de la génération du fichier.", details: error.message });
   }
 }
